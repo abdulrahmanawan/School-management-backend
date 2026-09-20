@@ -5,15 +5,34 @@ const helmet = require('helmet');
 
 const app = express();
 
+// ── Security & Middleware ──
 app.use(helmet());
+
+const allowedOrigins = [
+  'http://localhost:5173',
+  process.env.CLIENT_URL,
+].filter(Boolean);
+
 app.use(cors({
-  origin: 'http://localhost:5173',
+  origin: function (origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   credentials: true,
 }));
+
 app.use(express.json());
 app.use(cookieParser());
 
-// Route registrations – All modules
+// ── Health Check Route ──
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
+// ── Route Registrations ──
 app.use('/api/auth', require('./routes/authRoutes'));
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api/students', require('./routes/studentRoutes'));
@@ -32,9 +51,14 @@ app.use('/api/parent', require('./routes/parentRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/subjects', require('./routes/subjectRoutes'));
 
-// Error handling middleware
+// ── 404 Handler ──
+app.use((req, res) => {
+  res.status(404).json({ message: 'Route not found', path: req.originalUrl });
+});
+
+// ── Error Handler ──
 app.use((err, req, res, next) => {
-  console.error(err.stack);
+  console.error('❌ Error:', err.stack);
   res.status(500).json({ message: 'Internal server error' });
 });
 
